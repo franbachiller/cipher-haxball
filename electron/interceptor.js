@@ -1,4 +1,3 @@
-const { net } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
@@ -22,42 +21,82 @@ function loadBridge() {
   return bridgeCode;
 }
 
+// The IIFE in game-min.js ends with this anchor. We inject the bridge just
+// before it so all the game's minified classes (T, Da, B, ...) are in scope.
+const INJECT_ANCHOR = 'B.$p()})';
+
 /**
- * Set up request interception on the given Electron session.
- * Uses the modern session.protocol.handle('https', ...) API to intercept
- * game-min.js and inject the bridge code. All other requests pass through
- * via net.fetch which preserves cookies and session state.
+ * Set up request interception via the Chrome DevTools Protocol (CDP).
+ *
+ * Unlike protocol.handle('https', ...), which forces *every* HTTPS request to
+ * be re-fetched through Node (breaking ad/tracker domains with non-standard
+ * SSL and redirect chains), CDP's Fetch domain lets us pause only the requests
+ * that match game-min.js. Everything else is handled natively by Chromium —
+ * faster, and no SSL/redirect breakage.
  */
-function setupInterceptor(ses) {
+function setupInterceptor(webContents) {
   const bridge = loadBridge();
+  const dbg = webContents.debugger;
 
-  ses.protocol.handle('https', async (request) => {
-    // Fetch the original response using Electron's net module
-    // (preserves session cookies, proxy settings, etc.)
-    const response = await net.fetch(request, { bypassCustomProtocolHandlers: true });
+  try {
+    dbg.attach('1.3');
+  } catch (err) {
+    console.error('[Cipher] Failed to attach debugger:', err.message);
+    return;
+  }
 
-    // Only modify game-min.js responses
+  dbg.on('message', async (_event, method, params) => {
+    if (method !== 'Fetch.requestPaused') return;
+
+    const { requestId, request } = params;
+
+    // Only touch the game script; let everything else continue untouched.
     if (!request.url.includes('/g/game-min.js')) {
-      return response;
+      dbg.sendCommand('Fetch.continueRequest', { requestId }).catch(() => {});
+      return;
     }
 
-    let body = await response.text();
+    try {
+      // Grab the original response body from the paused request.
+      const res = await dbg.sendCommand('Fetch.getResponseBody', { requestId });
+      let body = res.base64Encoded
+        ? Buffer.from(res.body, 'base64').toString('utf8')
+        : res.body;
 
-    // Inject bridge before the IIFE closing anchor (same logic as browser.mjs)
-    const anchor = 'B.$p()})';
-    const idx = body.lastIndexOf(anchor);
-    if (idx !== -1) {
-      body = body.slice(0, idx) + bridge + '\n' + body.slice(idx);
-      console.log('[Cipher] Bridge injected into game-min.js');
-    } else {
-      console.warn('[Cipher] Could not find injection anchor in game-min.js');
+      const idx = body.lastIndexOf(INJECT_ANCHOR);
+      if (idx !== -1) {
+        body = body.slice(0, idx) + bridge + '\n' + body.slice(idx);
+        console.log('[Cipher] Bridge injected into game-min.js (%d bytes)', bridge.length);
+      } else {
+        console.error('[Cipher] Injection anchor not found — serving original game-min.js');
+      }
+
+      const headers = [
+        { name: 'Content-Type', value: 'application/javascript' },
+      ];
+
+      await dbg.sendCommand('Fetch.fulfillRequest', {
+        requestId,
+        responseCode: 200,
+        responseHeaders: headers,
+        body: Buffer.from(body, 'utf8').toString('base64'),
+      });
+    } catch (err) {
+      console.error('[Cipher] game-min.js intercept failed:', err.message);
+      // Don't break the game — let the original request proceed.
+      dbg.sendCommand('Fetch.continueRequest', { requestId }).catch(() => {});
     }
+  });
 
-    return new Response(body, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: { 'content-type': 'application/javascript' },
-    });
+  // Pause only game-min.js, and only at the Response stage so the body exists.
+  dbg.sendCommand('Fetch.enable', {
+    patterns: [
+      { urlPattern: '*game-min.js*', requestStage: 'Response' },
+    ],
+  }).then(() => {
+    console.log('[Cipher] CDP Fetch interception enabled (game-min.js only)');
+  }).catch(err => {
+    console.error('[Cipher] Fetch.enable failed:', err.message);
   });
 }
 

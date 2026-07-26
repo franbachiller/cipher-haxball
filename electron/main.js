@@ -1,7 +1,10 @@
 const { app, BrowserWindow, ipcMain, session } = require('electron');
 const path = require('path');
 const { setupInterceptor } = require('./interceptor');
-const { validateLicense, saveLicense, loadLicense, clearLicense } = require('./license');
+const { validateLicense, verifyToken, saveLicense, loadLicense, clearLicense } = require('./license');
+
+// How long the launcher runs offline before requiring a fresh online check.
+const GRACE_PERIOD_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
 
 let mainWindow = null;
 
@@ -21,17 +24,53 @@ function createWindow() {
     },
   });
 
+  bootstrap();
+}
+
+/**
+ * Decide whether to show the game or the login screen.
+ * Re-validates the saved token online so revocations take effect.
+ */
+async function bootstrap() {
   const saved = loadLicense();
-  if (saved && saved.token) {
-    startGame(saved.token);
+
+  if (!saved || !saved.token) {
+    return showLogin();
+  }
+
+  const valid = await verifyToken(saved.token);
+
+  if (valid === true) {
+    // Confirmed active online — refresh the grace-period timestamp
+    saveLicense({ ...saved, lastVerified: Date.now() });
+    return startGame(saved.token);
+  }
+
+  if (valid === false) {
+    // Revoked / expired / HWID mismatch — force re-activation
+    clearLicense();
+    return showLogin('license_invalid');
+  }
+
+  // valid === null: Supabase unreachable. Allow offline use within grace period.
+  const lastOk = saved.lastVerified || saved.activatedAt || 0;
+  if (Date.now() - lastOk < GRACE_PERIOD_MS) {
+    return startGame(saved.token);
+  }
+  return showLogin('offline_grace_expired');
+}
+
+function showLogin(reason) {
+  if (reason) {
+    mainWindow.loadFile(path.join(__dirname, 'ui', 'login.html'), { query: { reason } });
   } else {
     mainWindow.loadFile(path.join(__dirname, 'ui', 'login.html'));
   }
 }
 
 async function startGame(token) {
-  // Set up the game-min.js interceptor before navigating
-  setupInterceptor(mainWindow.webContents.session);
+  // Set up the game-min.js interceptor (CDP-based) before navigating
+  setupInterceptor(mainWindow.webContents);
 
   // Disable CORS restrictions so haxball.com loads cleanly
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, cb) => {
@@ -51,7 +90,8 @@ ipcMain.handle('license:activate', async (_event, key) => {
   try {
     const result = await validateLicense(key);
     if (result.success) {
-      saveLicense({ key, token: result.token, activatedAt: Date.now() });
+      const now = Date.now();
+      saveLicense({ key, token: result.token, activatedAt: now, lastVerified: now });
       await startGame(result.token);
       return { success: true };
     }
@@ -64,6 +104,12 @@ ipcMain.handle('license:activate', async (_event, key) => {
 ipcMain.handle('license:status', () => {
   const saved = loadLicense();
   return { active: !!(saved && saved.token), key: saved?.key || null };
+});
+
+ipcMain.handle('license:deactivate', () => {
+  clearLicense();
+  showLogin();
+  return { success: true };
 });
 
 ipcMain.handle('cipher:status', () => {

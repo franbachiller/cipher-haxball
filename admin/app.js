@@ -9,6 +9,17 @@ if (!cfg || !cfg.SUPABASE_URL || !cfg.SUPABASE_SERVICE_KEY) {
 
 const sb = supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_SERVICE_KEY);
 
+// ---- Environment badge ----
+// Make the active environment impossible to miss so prod is never edited
+// by accident. dev is calm/muted; prod is loud red.
+const envBadge = document.getElementById('env-badge');
+if (envBadge) {
+  const isProd = cfg.env === 'prod';
+  envBadge.textContent = isProd ? 'PRODUCTION' : 'dev';
+  envBadge.classList.add(isProd ? 'env-prod' : 'env-dev');
+  if (isProd) document.body.classList.add('is-prod');
+}
+
 // ---- DOM refs ----
 const createForm = document.getElementById('create-form');
 const noteInput = document.getElementById('note');

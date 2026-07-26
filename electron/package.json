@@ -5,8 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder",
-    "build:win": "electron-builder --win",
+    "build": "node scripts/build.js",
     "obfuscate": "node scripts/obfuscate.js"
   },
   "author": "Cipher",
@@ -32,12 +31,17 @@
       "interceptor.js",
       "license.js",
       "hwid.js",
+      "config.js",
+      "config.prod.js",
       "bridge.enc.js",
-      "ui/**/*"
+      "ui/**/*",
+      "!config.dev.js",
+      "!config.dev.example.js",
+      "!config.prod.example.js",
+      "!scripts/**/*"
     ],
     "win": {
-      "target": "nsis",
-      "icon": "ui/icon.ico"
+      "target": "nsis"
     },
     "nsis": {
       "oneClick": true,

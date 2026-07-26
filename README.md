@@ -17,29 +17,40 @@ dump/        Captured game assets for reference
 ## Environments
 
 There are two Supabase projects: **dev** and **prod**. Both run the same
-schema; only the credentials differ. **Dev is always the default** so routine
-testing never touches the production license database.
+schema; only the credentials differ.
 
-- Launcher: defaults to dev. Set `CIPHER_ENV=prod` to target prod.
-- Admin panel: defaults to dev. Open `index.html?env=prod` to target prod.
-  The panel shows a loud red `PRODUCTION` badge (and a red top border) whenever
-  you are pointed at prod, so you can never edit it by accident.
+The launcher's environment is tied to `app.isPackaged`, not to anything the
+client controls:
+
+- Running from source (`npm start`) → **dev**
+- The distributed `.exe` / installer → **prod**
+
+A client's app is always packaged, so they can **never** reach dev; and you
+can't accidentally hit prod from source. The prod build ships only
+`config.prod.js` — the packaged binary contains **zero** dev credentials
+(verified by extracting the asar).
+
+The admin panel defaults to dev; open `index.html?env=prod` to target prod. It
+shows a loud red `PRODUCTION` badge (and red top border) so you never edit prod
+by accident.
 
 ## Setup after cloning
 
-Credentials are **not** committed. Create both config files from the templates:
+Credentials are **not** committed. Create the local credential files from the
+templates:
 
 ```bash
-cp electron/config.example.js electron/config.js
+# Launcher — dev credentials (anon key), used by npm start
+cp electron/config.dev.example.js electron/config.dev.js
+
+# Admin panel — dev + prod service_role keys
 cp admin/config.example.js admin/config.js
 ```
 
-Each config holds a `dev` and a `prod` block. Fill both in:
-
-- **Launcher** (`electron/config.js`): the **anon** key for each project
-  (Settings → API in the dashboard).
-- **Admin** (`admin/config.js`): the **service_role** key for each project.
-  This key has full DB access — the file is gitignored, keep it local.
+- `electron/config.dev.js` — dev anon key. (`config.prod.js` is NOT created by
+  hand; the build generates it, see below.)
+- `admin/config.js` — holds a `dev` and `prod` block with service_role keys.
+  Full DB access; gitignored, keep it local.
 
 ### Database
 
@@ -54,7 +65,7 @@ happens on the `dev` branch against the dev Supabase project:
 
 ```bash
 git checkout dev
-cd electron && npm install && npm start   # defaults to dev
+cd electron && npm install && npm start   # runs against dev (unpackaged)
 ```
 
 Iterate on the bridge and test in a real game with F8/F9. Nothing you do
@@ -67,8 +78,26 @@ git checkout main && git merge dev
 git tag v1.0.0
 ```
 
-Only a tagged build, run with `CIPHER_ENV=prod` and the obfuscated bridge,
-should ever be distributed.
+## Building the installer
+
+The prod build injects prod credentials from environment variables, obfuscates
+the bridge, packages the `.exe`, and deletes the generated `config.prod.js`
+afterwards. The dev credentials are never included.
+
+```powershell
+cd electron
+$env:CIPHER_PROD_SUPABASE_URL="https://YOUR-PROD-PROJECT.supabase.co"
+$env:CIPHER_PROD_SUPABASE_ANON_KEY="your-prod-anon-key"
+npm run build
+```
+
+The installer lands in `electron/dist/`. To verify no dev credentials leaked,
+extract the asar and grep for the dev project ref:
+
+```powershell
+npx asar extract dist/win-unpacked/resources/app.asar out
+# grep the dev project ref in `out/` — it should return nothing
+```
 
 ## Admin panel
 
@@ -78,7 +107,10 @@ keys, open `admin/index.html?env=prod`.
 
 ## Security notes
 
-- `config.js` files (both) are gitignored — they hold the real keys.
+- All real keys live in gitignored files: `electron/config.dev.js`,
+  `electron/config.prod.js` (build-generated), and `admin/config.js`.
+  `electron/config.js` is a committed loader that holds no credentials.
 - The anon key is safe to ship in the launcher (it can only call the license
-  RPC functions). The service_role key must stay on your machine only.
+  RPC functions; RLS blocks direct table access). The service_role key must
+  stay on your machine only.
 - Never deploy the admin panel publicly.

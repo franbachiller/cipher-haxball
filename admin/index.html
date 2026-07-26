@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>cipher — admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header>
+    <span class="brand">cipher</span>
+    <span class="brand-sub">admin</span>
+  </header>
+
+  <main>
+
+    <!-- Create license -->
+    <section class="card" id="create-section">
+      <h2>New license</h2>
+      <form id="create-form">
+        <div class="row">
+          <div class="field">
+            <label for="note">Label</label>
+            <input type="text" id="note" placeholder="e.g. Pepito">
+          </div>
+          <div class="field field-sm">
+            <label for="days">Days</label>
+            <input type="number" id="days" placeholder="30" min="1">
+          </div>
+          <button type="submit">Generate</button>
+        </div>
+      </form>
+      <p id="created-key" class="mono" hidden></p>
+    </section>
+
+    <!-- License table -->
+    <section class="card">
+      <div class="table-head">
+        <h2>Licenses</h2>
+        <button id="refresh-btn" class="btn-ghost">Refresh</button>
+      </div>
+      <table id="license-table">
+        <thead>
+          <tr>
+            <th>Key</th>
+            <th>Label</th>
+            <th>HWID</th>
+            <th>Status</th>
+            <th>Expires</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="license-body"></tbody>
+      </table>
+      <p id="empty-msg" class="muted" hidden>No licenses yet.</p>
+    </section>
+
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

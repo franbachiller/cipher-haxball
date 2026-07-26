@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;">
+  <title>cipher — activate</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="login.css">
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <h1>cipher</h1>
+      <div class="separator"></div>
+    </div>
+
+    <form id="activate-form">
+      <div class="input-group">
+        <label for="license-key">License key</label>
+        <input
+          type="text"
+          id="license-key"
+          placeholder="CIPHER-XXXX-XXXX-XXXX"
+          autocomplete="off"
+          spellcheck="false"
+          required
+        >
+      </div>
+
+      <button type="submit" id="activate-btn">
+        <span class="btn-text">Activate</span>
+        <span class="btn-loading" hidden>Activating...</span>
+      </button>
+
+      <p id="error-msg" class="error" hidden></p>
+    </form>
+
+    <div class="footer">
+      <p id="version"></p>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('activate-form');
+    const keyInput = document.getElementById('license-key');
+    const btn = document.getElementById('activate-btn');
+    const btnText = btn.querySelector('.btn-text');
+    const btnLoading = btn.querySelector('.btn-loading');
+    const errorMsg = document.getElementById('error-msg');
+    const versionEl = document.getElementById('version');
+
+    // Show version
+    window.cipher.getStatus().then(s => {
+      versionEl.textContent = `v${s.version}`;
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const key = keyInput.value.trim();
+      if (!key) return;
+
+      // UI feedback
+      btn.disabled = true;
+      btnText.hidden = true;
+      btnLoading.hidden = false;
+      errorMsg.hidden = true;
+
+      try {
+        const result = await window.cipher.activate(key);
+        if (!result.success) {
+          showError(result.error || 'Activation failed');
+        }
+        // On success, main.js navigates to haxball.com/play automatically
+      } catch (err) {
+        showError('Connection error — is the license server running?');
+      } finally {
+        btn.disabled = false;
+        btnText.hidden = false;
+        btnLoading.hidden = true;
+      }
+    });
+
+    function showError(msg) {
+      errorMsg.textContent = msg;
+      errorMsg.hidden = false;
+    }
+
+    // Auto-format key input: uppercase, add dashes
+    keyInput.addEventListener('input', () => {
+      let val = keyInput.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+      keyInput.value = val;
+    });
+  </script>
+</body>
+</html>

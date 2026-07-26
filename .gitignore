@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Supabase credentials — config.js holds real keys (service_role / anon).
+# Only the *.example.js templates are committed. NEVER commit config.js.
+config.js
+admin/config.js
+electron/config.js
+
+# Environment / secrets
+.env
+.env.*
+*.key
+
+# Build output
+dist/
+electron/dist/
+
+# Local license cache
+*.dat

@@ -1,0 +1,272 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #111;
+  color: #ccc;
+  min-height: 100vh;
+}
+
+/* ---- Header ---- */
+
+header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 20px 32px;
+  border-bottom: 1px solid #1e1e1e;
+}
+
+.brand {
+  font-size: 16px;
+  font-weight: 200;
+  letter-spacing: 6px;
+  color: #d42020;
+  text-transform: lowercase;
+}
+
+.brand-sub {
+  font-size: 11px;
+  color: #444;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* ---- Layout ---- */
+
+main {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.card {
+  background: #161616;
+  border: 1px solid #1e1e1e;
+  border-radius: 6px;
+  padding: 20px 24px;
+}
+
+.card h2 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 16px;
+}
+
+/* ---- Create form ---- */
+
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.field { flex: 1; }
+.field-sm { max-width: 80px; }
+
+.field label {
+  display: block;
+  font-size: 10px;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+
+.field input {
+  width: 100%;
+  padding: 9px 10px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  color: #eee;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.field input:focus {
+  border-color: #d42020;
+}
+
+.field input::placeholder {
+  color: #333;
+}
+
+.row button,
+button[type="submit"] {
+  padding: 9px 18px;
+  background: #d42020;
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.row button:hover,
+button[type="submit"]:hover {
+  background: #b81a1a;
+}
+
+.mono {
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 14px;
+  color: #d42020;
+  margin-top: 12px;
+  letter-spacing: 1px;
+  user-select: all;
+}
+
+/* ---- Table ---- */
+
+.table-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0;
+}
+
+.table-head h2 { margin-bottom: 0; }
+
+.btn-ghost {
+  background: none;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  padding: 5px 12px;
+  color: #666;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.btn-ghost:hover {
+  border-color: #444;
+  color: #aaa;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+
+th {
+  font-size: 10px;
+  font-weight: 600;
+  color: #444;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-align: left;
+  padding: 8px 8px;
+  border-bottom: 1px solid #1e1e1e;
+}
+
+td {
+  font-size: 12px;
+  padding: 10px 8px;
+  border-bottom: 1px solid #1a1a1a;
+  vertical-align: middle;
+}
+
+td.key {
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: #eee;
+}
+
+td.hwid {
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 10px;
+  color: #555;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.status-active {
+  color: #2ecc40;
+  background: rgba(46, 204, 64, 0.1);
+}
+
+.status-expired {
+  color: #888;
+  background: rgba(136, 136, 136, 0.1);
+}
+
+.status-revoked {
+  color: #d42020;
+  background: rgba(212, 32, 32, 0.1);
+}
+
+.status-unbound {
+  color: #f0ad4e;
+  background: rgba(240, 173, 78, 0.1);
+}
+
+.actions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.btn-revoke,
+.btn-delete {
+  background: none;
+  border: none;
+  color: #555;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 3px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.btn-revoke:hover {
+  color: #f0ad4e;
+  background: rgba(240, 173, 78, 0.08);
+}
+
+.btn-delete:hover {
+  color: #d42020;
+  background: rgba(212, 32, 32, 0.08);
+}
+
+.muted {
+  color: #333;
+  font-size: 12px;
+  text-align: center;
+  padding: 20px 0;
+}
+
+/* ---- Number input no arrows ---- */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] { -moz-appearance: textfield; }

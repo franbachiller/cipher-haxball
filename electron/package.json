@@ -1,0 +1,50 @@
+{
+  "name": "cipher-launcher",
+  "version": "1.0.0",
+  "description": "Cipher HaxBall Launcher",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "obfuscate": "node scripts/obfuscate.js"
+  },
+  "author": "Cipher",
+  "license": "UNLICENSED",
+  "private": true,
+  "devDependencies": {
+    "electron": "^36.9.5",
+    "electron-builder": "^26.0.0",
+    "javascript-obfuscator": "^4.1.1"
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2"
+  },
+  "build": {
+    "appId": "com.cipher.haxball",
+    "productName": "Cipher",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "interceptor.js",
+      "license.js",
+      "hwid.js",
+      "bridge.enc.js",
+      "ui/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "ui/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false
+    },
+    "asar": true,
+    "asarUnpack": []
+  }
+}

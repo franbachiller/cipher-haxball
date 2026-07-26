@@ -6,6 +6,10 @@ const { validateLicense, verifyToken, saveLicense, loadLicense, clearLicense } =
 // How long the launcher runs offline before requiring a fresh online check.
 const GRACE_PERIOD_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
 
+// Match electron-builder's appId so Windows uses Cipher's icon and groups
+// taskbar windows under the application instead of the generic Electron app.
+app.setAppUserModelId('com.cipher.haxball');
+
 let mainWindow = null;
 
 function createWindow() {
@@ -15,6 +19,7 @@ function createWindow() {
     minWidth: 960,
     minHeight: 540,
     title: 'Cipher',
+    icon: path.join(__dirname, 'ui', 'cipherC.png'),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

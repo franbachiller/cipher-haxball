@@ -41,8 +41,10 @@
       "!scripts/**/*"
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "ui/icon.ico"
     },
+    "icon": "ui/icon.ico",
     "nsis": {
       "oneClick": true,
       "perMachine": false,

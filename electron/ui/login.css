@@ -24,6 +24,14 @@ body {
   margin-bottom: 40px;
 }
 
+.logo-icon {
+  display: block;
+  width: 96px;
+  height: 96px;
+  margin: 0 auto 20px;
+  object-fit: contain;
+}
+
 .logo h1 {
   font-size: 34px;
   font-weight: 200;

@@ -102,8 +102,10 @@ npx asar extract dist/win-unpacked/resources/app.asar out
 ## Admin panel
 
 Open `admin/index.html` in a browser (dev by default). It talks directly to
-Supabase to create, revoke, and delete license keys. To manage production
-keys, open `admin/index.html?env=prod`.
+Supabase to create, revoke, and delete license keys. Use the visible
+`DEV / PRODUCTION` switch in the header to change environments. Production is
+always marked red, changes the generate button text, and asks for confirmation
+before creating a key.
 
 ## Security notes
 

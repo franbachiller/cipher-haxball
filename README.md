@@ -3,6 +3,9 @@
 HaxBall enhancement suite: an Electron launcher that injects gameplay assists
 into haxball.com, gated behind a Supabase-backed license system.
 
+Para el procedimiento operativo completo de desarrollo, pruebas, seguridad y
+releases, ver [`docs/WORKFLOW.md`](docs/WORKFLOW.md).
+
 ## Structure
 
 ```

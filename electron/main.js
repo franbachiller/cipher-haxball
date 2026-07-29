@@ -18,7 +18,7 @@ function createWindow() {
     height: 720,
     minWidth: 960,
     minHeight: 540,
-    title: 'Cipher',
+    title: 'Cipher Launcher',
     icon: path.join(__dirname, 'ui', 'cipherC.png'),
     autoHideMenuBar: true,
     webPreferences: {
@@ -27,6 +27,12 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: false,
     },
+  });
+
+  // Keep the window title fixed; haxball.com would otherwise overwrite it.
+  mainWindow.on('page-title-updated', (e) => {
+    e.preventDefault();
+    mainWindow.setTitle('Cipher Launcher');
   });
 
   bootstrap();

@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, session } = require('electron');
 const path = require('path');
 const { setupInterceptor } = require('./interceptor');
+const { setupAdblock } = require('./adblock');
 const { validateLicense, verifyToken, saveLicense, loadLicense, clearLicense } = require('./license');
 
 // How long the launcher runs offline before requiring a fresh online check.
@@ -82,6 +83,9 @@ function showLogin(reason) {
 async function startGame(token) {
   // Set up the game-min.js interceptor (CDP-based) before navigating
   setupInterceptor(mainWindow.webContents);
+
+  // Block ads/trackers at the network layer and hide the empty ad column
+  setupAdblock(mainWindow.webContents.session, mainWindow.webContents);
 
   // Disable CORS restrictions so haxball.com loads cleanly
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, cb) => {

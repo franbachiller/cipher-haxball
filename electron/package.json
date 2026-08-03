@@ -29,6 +29,7 @@
       "main.js",
       "preload.js",
       "interceptor.js",
+      "adblock.js",
       "license.js",
       "hwid.js",
       "config.js",

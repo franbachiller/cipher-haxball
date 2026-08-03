@@ -53,6 +53,20 @@ Para modificar las features del juego:
 [Cipher] Bridge injected into game-min.js (...)
 ```
 
+## Bloqueo de anuncios
+
+`electron/adblock.js` elimina la publicidad de haxball.com en dos capas:
+
+- Red: `session.webRequest.onBeforeRequest` cancela todo request hacia los
+  dominios de anuncios y trackers (cpmstar, doubleclick, pubmatic, rubicon,
+  amazon-adsystem, adform, adsafeprotected, temu, etc.). Nada se descarga.
+- Visual: se inyecta CSS que oculta la columna `.rightbar` para que el juego
+  ocupe todo el ancho sin dejar un hueco vacío.
+
+`ALLOWED_HOSTS` protege haxball, sus fuentes y Supabase para que nunca se
+bloqueen por error. Si en el futuro aparece un anuncio de un dominio nuevo,
+agregar el sufijo del host a `BLOCKED_HOSTS`.
+
 ## Licencias y panel de administración
 
 Abrir:

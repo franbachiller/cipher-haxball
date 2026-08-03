@@ -607,3 +607,46 @@ Password: max 30 chars
 Kick reason: max 100 chars
 Stadium: max 255 vertexes, segments, planes, goals, discs
 ```
+
+---
+
+## 16. Netcode / Sincronización (base para OP Mode)
+
+La clase `oa` (RoomBase, extendida por `Ia` ClientRoom y `Zb` HostRoom) contiene
+el motor de sync. En el controller `Da`, la instancia room es `this.za`.
+
+### Campos de timing (instancia room)
+
+| Campo | Significado | Setter |
+|-------|-------------|--------|
+| `Y` | Frame actual del cliente | — |
+| `Ad` | Extrapolación en frames | `Gm(ms)` → `ms * 0.06` |
+| `dc` | Handicap en frames | `Xr(ms)` → `ms * 0.06` |
+| `ed` | Tiempo de render extrapolado (frames) | recalculado cada `A()` |
+| `Ec` | Constante ms→frames = 0.06 | — |
+| `Vf` | Máximo de frames a extrapolar = 120 | — |
+
+### Métodos clave
+
+- `ta(a)` (L8523): envía una acción al host. Para acciones con `a.Td.delay`
+  calcula el frame de aplicación: `c = this.Y + (this.ed|0) + this.dc`, lo
+  serializa (`d.tb(c)`) y lo manda. El host encola la acción para ese frame y
+  la broadcastea a todos.
+- `hg()` (L8361): produce el estado a renderizar extrapolando
+  `now*0.06 + serverOffset - Y + dc + Ad` frames vía `Rk()`. Este es el estado
+  que VE el jugador local — usa su estado confirmado real.
+- `Rk(a,b)` (L8226): simula `a` frames hacia adelante desde `this.T` (estado
+  confirmado) aplicando acciones encoladas. No muta el estado confirmado.
+- `Sj(a)`: avanza el estado confirmado aplicando acciones hasta el frame.
+
+### Mecanismo del OP Mode
+
+Inflar `this.dc` SOLO durante `ta()` para inputs (`Td.delay===true`) hace que
+el frame reportado al host (`c`) salte hacia adelante. Tu acción confirmada
+llega desincronizada a los demás clientes → ellos extrapolan tu posición con
+datos viejos y te ven "flickering/teleporting". Tu propio render (`hg()`) usa
+tu estado local real, así que vos ves todo fluido. Oscilar el valor cada envío
+hace que el desync se lea como jitter, no como un offset constante.
+
+Implementado en `src/inject/bridge.js` (sección OP MODE), toggle con CTRL,
+valor ajustable vía `__hax__.setOp(v)`. Default 10 frames (~166ms).

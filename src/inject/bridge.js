@@ -545,6 +545,45 @@ function renderAimLine(renderer, gameState) {
   ctx.restore();
 }
 
+// ====================== OP MODE ======================
+// Exploits the netcode's action-frame scheduling. In room.ta(action), the
+// game computes the frame at which your action applies as:
+//     c = this.Y + (this.ed|0) + this.dc      (frame + render-extrap + handicap)
+// and ships that frame number to the host, who broadcasts it to everyone.
+//
+// OP Mode temporarily inflates this.dc ONLY during the ta() call for input
+// actions (Td.delay === true). Your reported action-frame jumps ahead, so
+// remote clients extrapolate your position from stale data and see you
+// flicker/teleport — while your own render (hg(), which reads your real
+// local state) stays perfectly smooth. The value oscillates each send so the
+// desync reads as jitter, not a constant offset.
+//
+// op.value is in netcode frames (game runs at ~0.06 frames/ms, so the classic
+// "10" ≈ 166ms of desync). Toggle with CTRL.
+const op={on:false,value:10,phase:0,hooked:false};
+
+function installOpMode(room){
+  if(op.hooked) return;
+  const proto=Object.getPrototypeOf(room);
+  if(!proto||!proto.ta) return;
+  const _origTa=proto.ta;
+  proto.ta=function(a){
+    // Only desync real gameplay inputs (delayed actions). Chat, admin, etc.
+    // are immediate (delay=false) and must stay in sync.
+    if(op.on && a && a.Td && a.Td.delay){
+      const saved=this.dc;
+      // Oscillate: alternate 0 / value so remote extrapolation keeps missing.
+      op.phase^=1;
+      this.dc=saved + (op.phase?op.value:0);
+      try{ return _origTa.call(this,a); }
+      finally{ this.dc=saved; }
+    }
+    return _origTa.call(this,a);
+  };
+  op.hooked=true;
+  console.log('%c[Cipher] OP Mode hook installed','color:#0f0');
+}
+
 // ====================== CONTROLLER ======================
 const hax={active:false,aimAssist:true,controller:null,room:null};
 const _origSf=Da.prototype.sf;
@@ -552,6 +591,7 @@ Da.prototype.sf=function(){
   // Always update — a new Da is created each time you join a room
   if(hax.controller!==this){
     hax.controller=this;hax.room=this.za;
+    installOpMode(this.za);
     console.log('%c[Cipher] Controller captured','color:#0f0');
   }
   if(hax.active&&hax.room){
@@ -583,8 +623,17 @@ window.addEventListener('keydown',function(e){
     console.log('%c[Cipher] Aim assist '+(hax.aimAssist?'ON':'OFF'),
       'color:'+(hax.aimAssist?'#0f0':'#f44')+';font-size:14px;font-weight:bold');
   }
+  if(e.code==='ControlLeft'||e.code==='ControlRight'){
+    e.preventDefault();e.stopPropagation();
+    op.on=!op.on;
+    console.log('%c[Cipher] OP Mode '+(op.on?'ON':'OFF')+' (value '+op.value+')',
+      'color:'+(op.on?'#0f0':'#f44')+';font-size:14px;font-weight:bold');
+  }
 },true);
 
+// Adjust OP Mode strength from the console: __hax__.setOp(value)
+hax.setOp=function(v){op.value=Math.max(0,v|0);console.log('[Cipher] OP Mode value =',op.value);};
+
 window.__hax__=hax;
-console.log('%c[Cipher] v4 loaded — F8: aim assist | F9: bot AI','color:#0af;font-size:12px');
+console.log('%c[Cipher] v4 loaded — F8: aim assist | F9: bot AI | CTRL: OP Mode','color:#0af;font-size:12px');
 })();

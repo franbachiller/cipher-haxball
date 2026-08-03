@@ -223,6 +223,31 @@ Primero comprobar el entorno:
 - El instalador usa PRODUCTION.
 - La licencia debe existir en el mismo entorno que usa el launcher.
 
+### "Error: TypeError: Failed to fetch" al crear/validar licencias
+
+`Failed to fetch` es un error de red del navegador, no de la base de datos.
+La causa más común, sobre todo al volver tras un tiempo sin usar el proyecto,
+es que **Supabase pausó el proyecto por inactividad** (free tier). Al pausarse,
+Supabase quita el DNS y el host deja de resolver.
+
+Diagnóstico rápido (reemplazar por el project ref real):
+
+```powershell
+nslookup TU-PROJECT-REF.supabase.co
+```
+
+- Si devuelve "Non-existent domain": el proyecto está pausado o eliminado.
+- Si resuelve a una IP: el problema es otro (CORS, key mal, etc.).
+
+Solución si está pausado:
+
+1. Abrir el dashboard del proyecto en `supabase.com/dashboard`.
+2. Pulsar "Restore" / "Resume project".
+3. Esperar 1-2 minutos a que el DNS y la base vuelvan (los datos se conservan).
+
+Para evitarlo en producción, considerar un plan pago o reanudar el proyecto
+manualmente tras periodos de inactividad.
+
 ### Una credencial fue commiteada
 
 1. No pushear.

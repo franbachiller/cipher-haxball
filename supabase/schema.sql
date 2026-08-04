@@ -1,5 +1,14 @@
 -- Cipher license server schema
 -- Run this in the Supabase SQL Editor (Dashboard -> SQL Editor -> New query)
+-- Run it once per project (dev AND prod).
+
+-- ============================================================
+-- Extensions
+-- ============================================================
+-- pgcrypto provides gen_random_bytes(), used to mint tokens and keys below.
+-- On Supabase it lives in the `extensions` schema. Without this the RPCs fail
+-- with: function gen_random_bytes(integer) does not exist.
+create extension if not exists pgcrypto with schema extensions;
 
 -- ============================================================
 -- Tables

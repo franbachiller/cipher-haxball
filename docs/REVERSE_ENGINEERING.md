@@ -641,12 +641,28 @@ el motor de sync. En el controller `Da`, la instancia room es `this.za`.
 
 ### Mecanismo del OP Mode
 
-Inflar `this.dc` SOLO durante `ta()` para inputs (`Td.delay===true`) hace que
-el frame reportado al host (`c`) salte hacia adelante. Tu acción confirmada
-llega desincronizada a los demás clientes → ellos extrapolan tu posición con
-datos viejos y te ven "flickering/teleporting". Tu propio render (`hg()`) usa
-tu estado local real, así que vos ves todo fluido. Oscilar el valor cada envío
-hace que el desync se lea como jitter, no como un offset constante.
+En `ta()`, para inputs (`Td.delay===true`) el frame de aplicación es
+`c = Y + (ed|0) + dc`. Ese `c` se envía al host Y se guarda en `a.gb` para tu
+predicción local. Normalmente `c - Y` es ~3..5 (el lead de tu extrapolación).
+
+El anti-opmode de la comunidad (node-haxball, discussion #51) detecta el cheat
+justo por esto: filtra los mensajes de input y calcula `clientFrame - hostFrame`;
+si es anormalmente BAJO (`<= 2`, a menudo 0 o negativo) es opmode.
+
+Por lo tanto OP Mode = reportar al host un frame MÁS TEMPRANO manteniendo el
+frame real localmente:
+- Host y clientes remotos reciben tu input como "ya aplicado" (frame ≈ ahora),
+  no pueden extrapolarte hacia adelante → tu posición confirmada salta y te ven
+  shaky/intocable.
+- Vos: `a.gb` conserva el `c` real, así tu propia predicción sigue fluida.
+
+No alcanza con poner `dc`/`ed` en 0 (el `ta` re-clampea `dc>=0` y suma `ed`, y
+además el frame bajo debe llegar al cable, no solo a los campos). Por eso el
+hook reimplementa `ta` para inputs: serializa `c - value` al host y guarda el
+`c` real en `a.gb`.
+
+IMPORTANTE (corrección de una versión previa): sumar a `dc` es el error opuesto
+— sube `c`, te agrega delay a vos y no afecta a los demás. Hay que RESTAR.
 
 Implementado en `src/inject/bridge.js` (sección OP MODE), toggle con CTRL,
-valor ajustable vía `__hax__.setOp(v)`. Default 10 frames (~166ms).
+valor ajustable vía `__hax__.setOp(v)`. Default 6 frames antes.

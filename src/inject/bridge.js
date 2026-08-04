@@ -546,21 +546,28 @@ function renderAimLine(renderer, gameState) {
 }
 
 // ====================== OP MODE ======================
-// Exploits the netcode's action-frame scheduling. In room.ta(action), the
-// game computes the frame at which your action applies as:
-//     c = this.Y + (this.ed|0) + this.dc      (frame + render-extrap + handicap)
-// and ships that frame number to the host, who broadcasts it to everyone.
+// The netcode schedules each input to apply at a future frame. In ClientRoom
+// ta(action), for delayed actions (real inputs):
+//     c = this.Y + (this.ed|0) + this.dc
+// and c is BOTH sent to the host (d.tb(c)) AND stored locally (a.gb = c) for
+// your own prediction. The host broadcasts your input tagged with frame c.
 //
-// OP Mode temporarily inflates this.dc ONLY during the ta() call for input
-// actions (Td.delay === true). Your reported action-frame jumps ahead, so
-// remote clients extrapolate your position from stale data and see you
-// flicker/teleport — while your own render (hg(), which reads your real
-// local state) stays perfectly smooth. The value oscillates each send so the
-// desync reads as jitter, not a constant offset.
+// Normally c - Y is ~3..5 (your render-extrapolation lead). The community
+// anti-opmode detects opmode by exactly this: input messages whose
+// (clientFrame - hostFrame) is abnormally LOW (<= 2, often 0 or negative).
 //
-// op.value is in netcode frames (game runs at ~0.06 frames/ms, so the classic
-// "10" ≈ 166ms of desync). Toggle with CTRL.
-const op={on:false,value:10,phase:0,hooked:false};
+// So OP Mode = report a LOW/earlier frame to the host while keeping your real
+// frame locally:
+//   - host + remote clients: input arrives "already applied" (frame ~= now),
+//     so they can't extrapolate you ahead — your confirmed position jumps and
+//     you read as shaky/unhittable to them.
+//   - you: a.gb keeps the real c, so your own prediction stays smooth.
+//
+// We can't just zero this.dc/ed (ta re-clamps dc>=0 and still adds ed), and a
+// lower c must ALSO reach the wire, not only the fields. So we reimplement
+// ta for inputs: send c - value to the host, store the real c locally.
+// op.value = how many frames earlier to report (bigger = more desync).
+const op={on:false,value:6,hooked:false};
 
 function installOpMode(room){
   if(op.hooked) return;
@@ -568,17 +575,22 @@ function installOpMode(room){
   if(!proto||!proto.ta) return;
   const _origTa=proto.ta;
   proto.ta=function(a){
-    // Only desync real gameplay inputs (delayed actions). Chat, admin, etc.
-    // are immediate (delay=false) and must stay in sync.
-    if(op.on && a && a.Td && a.Td.delay){
-      const saved=this.dc;
-      // Oscillate: alternate 0 / value so remote extrapolation keeps missing.
-      op.phase^=1;
-      this.dc=saved + (op.phase?op.value:0);
-      try{ return _origTa.call(this,a); }
-      finally{ this.dc=saved; }
+    // Only touch real gameplay inputs. Chat/admin (delay=false) stay in sync.
+    if(!(op.on && a && a.Td && a.Td.delay && 3===this.yd)){
+      return _origTa.call(this,a);
     }
-    return _origTa.call(this,a);
+    // Reimplement ta() exactly, but send an earlier frame to the host.
+    const b=this.jq++;
+    if(0>this.dc) this.dc=0;
+    const cReal=this.Y+(this.ed|0)+this.dc;      // real apply-frame (local)
+    const cSend=cReal-op.value;                  // earlier frame (to host)
+    const d=A.ka();
+    d.m(1);
+    d.tb(cSend);                                 // <-- desynced frame on wire
+    d.tb(b);
+    p.Cj(a,d);
+    this.Vb(d);
+    if(a.Td.Ca){ a.Ge=b; a.P=this.yc; a.gb=cReal; this.Hg.sn(a); } // real local
   };
   op.hooked=true;
   console.log('%c[Cipher] OP Mode hook installed','color:#0f0');

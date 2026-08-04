@@ -567,14 +567,23 @@ function renderAimLine(renderer, gameState) {
 // lower c must ALSO reach the wire, not only the fields. So we reimplement
 // ta for inputs: send c - value to the host, store the real c locally.
 // op.value = how many frames earlier to report (bigger = more desync).
-const op={on:false,value:6,hooked:false};
+const op={on:false,value:6,hooked:false,diag:true,_n:0};
 
 function installOpMode(room){
   if(op.hooked) return;
   const proto=Object.getPrototypeOf(room);
-  if(!proto||!proto.ta) return;
+  if(!proto||!proto.ta){ console.warn('[Cipher] OP: no ta on room proto'); return; }
   const _origTa=proto.ta;
   proto.ta=function(a){
+    // DIAGNOSTIC: log real frame numbers for input actions so we can see what
+    // the netcode actually does. Remove once the mechanism is confirmed.
+    if(op.diag && a && a.Td && a.Td.delay && 3===this.yd){
+      if((op._n++ % 30)===0){
+        console.log('[Cipher OP diag] Y=%d ed=%d dc=%d -> cReal=%d cSend=%d on=%s',
+          this.Y, this.ed|0, this.dc, this.Y+(this.ed|0)+this.dc,
+          this.Y+(this.ed|0)+this.dc-op.value, op.on);
+      }
+    }
     // Only touch real gameplay inputs. Chat/admin (delay=false) stay in sync.
     if(!(op.on && a && a.Td && a.Td.delay && 3===this.yd)){
       return _origTa.call(this,a);

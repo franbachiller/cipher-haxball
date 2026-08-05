@@ -567,7 +567,7 @@ function renderAimLine(renderer, gameState) {
 // lower c must ALSO reach the wire, not only the fields. So we reimplement
 // ta for inputs: send c - value to the host, store the real c locally.
 // op.value = how many frames earlier to report (bigger = more desync).
-const op={on:false,value:6,hooked:false,diag:true,_n:0};
+const op={on:false,value:6,phase:0,hooked:false,diag:true,_n:0};
 
 function installOpMode(room){
   if(op.hooked) return;
@@ -590,14 +590,24 @@ function installOpMode(room){
     if(!(op.on && a && a.Td && a.Td.delay && 3===this.yd)){
       return _origTa.call(this,a);
     }
-    // Reimplement ta() exactly, but send an earlier frame to the host.
+    // Reimplement ta(): oscillate the frame we report across the host's clamp
+    // window [Y, Y+20]. The host derives Hn/In from our frame and broadcasts
+    // them; jumping between the extremes each send makes remote clients
+    // extrapolate our disc erratically (shaky). Keep the real frame locally so
+    // our own view stays smooth.
     const b=this.jq++;
     if(0>this.dc) this.dc=0;
     const cReal=this.Y+(this.ed|0)+this.dc;      // real apply-frame (local)
-    const cSend=cReal-op.value;                  // earlier frame (to host)
+    op.phase^=1;
+    // Alternate between the two ends of the clamp window the host enforces.
+    const cSend=op.phase ? this.Y : (this.Y+20);
+    if((op._m=(op._m||0)+1)%20===0){
+      console.log('[Cipher OP ACTIVE] cReal=%d cSend=%d (diffY=%d phase=%d)',
+        cReal, cSend, cSend-this.Y, op.phase);
+    }
     const d=A.ka();
     d.m(1);
-    d.tb(cSend);                                 // <-- desynced frame on wire
+    d.tb(cSend);                                 // <-- oscillating frame on wire
     d.tb(b);
     p.Cj(a,d);
     this.Vb(d);

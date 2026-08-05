@@ -616,7 +616,9 @@ function installOpMode(room){
     d.tb(b);
     p.Cj(a,d);
     this.Vb(d);
-    if(a.Td.Ca){ a.Ge=b; a.P=this.yc; a.gb=cReal; this.Hg.sn(a); } // real local
+    // Per-tick resends are wire-only: never apply locally (would double our
+    // own movement). Real inputs keep the normal local apply.
+    if(a.Td.Ca && !a.__cipherResend){ a.Ge=b; a.P=this.yc; a.gb=cReal; this.Hg.sn(a); }
   };
   op.hooked=true;
   console.log('%c[Cipher] OP Mode hook installed','color:#0f0');
@@ -643,6 +645,20 @@ Da.prototype.sf=function(){
       if(inp&16)bc.Qc.add('Kick');
       bc.A();
     }
+  }
+  // OP Mode continuous resend: the game only sends input on key CHANGE, so a
+  // single desynced frame-stamp isn't enough for a sustained shaky effect.
+  // While OP is on, re-send the current input every tick through ta() (which
+  // applies the frame swing), producing a continuous stream of desynced
+  // position updates that wreck enemy extrapolation. Our local state is
+  // unaffected because ta() stores the real frame in a.gb.
+  if(op.on && hax.room && typeof Ja!=='undefined'){
+    try{
+      const msg=new Ja();
+      msg.input = this.W ? (this.W.ng||0) : 0;
+      msg.__cipherResend=true;   // wire-only: don't apply locally
+      hax.room.ta(msg);
+    }catch(e){ if(!op._err){op._err=1;console.log('[Cipher] OP resend err',e.message);} }
   }
   return _origSf.call(this);
 };

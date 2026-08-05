@@ -572,16 +572,18 @@ const op={on:false,value:6,hooked:false,diag:true,_n:0};
 function installOpMode(room){
   if(op.hooked) return;
   const proto=Object.getPrototypeOf(room);
-  if(!proto||!proto.ta){ console.warn('[Cipher] OP: no ta on room proto'); return; }
+  if(!proto||!proto.ta){ console.log('[Cipher] OP: no ta on room proto'); return; }
+  // DIAG: report what the room actually is and where ta lives.
+  console.log('[Cipher] OP diag: room ctor=%s protoHasTa=%s ownTa=%s',
+    room.constructor&&room.constructor.name, typeof proto.ta,
+    Object.prototype.hasOwnProperty.call(proto,'ta'));
   const _origTa=proto.ta;
   proto.ta=function(a){
-    // DIAGNOSTIC: log real frame numbers for input actions so we can see what
-    // the netcode actually does. Remove once the mechanism is confirmed.
-    if(op.diag && a && a.Td && a.Td.delay && 3===this.yd){
-      if((op._n++ % 30)===0){
-        console.log('[Cipher OP diag] Y=%d ed=%d dc=%d -> cReal=%d cSend=%d on=%s',
-          this.Y, this.ed|0, this.dc, this.Y+(this.ed|0)+this.dc,
-          this.Y+(this.ed|0)+this.dc-op.value, op.on);
+    // DIAG: log EVERY action through ta so we can see if inputs route here.
+    if(op.diag){
+      if((op._n++ % 20)===0){
+        console.log('[Cipher OP diag] ta called: hasTd=%s delay=%s yd=%d Y=%d ed=%d dc=%d on=%s',
+          !!(a&&a.Td), a&&a.Td&&a.Td.delay, this.yd, this.Y, this.ed|0, this.dc, op.on);
       }
     }
     // Only touch real gameplay inputs. Chat/admin (delay=false) stay in sync.

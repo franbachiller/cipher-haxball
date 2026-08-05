@@ -567,7 +567,7 @@ function renderAimLine(renderer, gameState) {
 // lower c must ALSO reach the wire, not only the fields. So we reimplement
 // ta for inputs: send c - value to the host, store the real c locally.
 // op.value = how many frames earlier to report (bigger = more desync).
-const op={on:false,value:50,phase:0,hooked:false,diag:true,_n:0};
+const op={on:false,value:50,hold:6,phase:0,hooked:false,diag:true,_n:0};
 
 function installOpMode(room){
   if(op.hooked) return;
@@ -603,7 +603,12 @@ function installOpMode(room){
     const b=this.jq++;
     if(0>this.dc) this.dc=0;
     const cReal=this.Y+(this.ed|0)+this.dc;      // real apply-frame (local)
-    op.phase^=1;
+    // Hold each extreme for `hold` ticks before flipping. Alternating every
+    // single tick at 60fps lets the observer average it back to smooth; holding
+    // one side for several ticks makes the disc settle far ahead, then snap far
+    // behind = visible teleport.
+    op._c=(op._c||0)+1;
+    if(op._c>=(op.hold||6)){ op._c=0; op.phase^=1; }
     const swing=op.value;                        // how far to swing (frames)
     const cSend=op.phase ? (this.Y - swing) : (this.Y + swing);
     if((op._m=(op._m||0)+1)%20===0){

@@ -546,87 +546,33 @@ function renderAimLine(renderer, gameState) {
 }
 
 // ====================== OP MODE ======================
-// The netcode schedules each input to apply at a future frame. In ClientRoom
-// ta(action), for delayed actions (real inputs):
-//     c = this.Y + (this.ed|0) + this.dc
-// and c is BOTH sent to the host (d.tb(c)) AND stored locally (a.gb = c) for
-// your own prediction. The host broadcasts your input tagged with frame c.
-//
-// Normally c - Y is ~3..5 (your render-extrapolation lead). The community
-// anti-opmode detects opmode by exactly this: input messages whose
-// (clientFrame - hostFrame) is abnormally LOW (<= 2, often 0 or negative).
-//
-// So OP Mode = report a LOW/earlier frame to the host while keeping your real
-// frame locally:
-//   - host + remote clients: input arrives "already applied" (frame ~= now),
-//     so they can't extrapolate you ahead — your confirmed position jumps and
-//     you read as shaky/unhittable to them.
-//   - you: a.gb keeps the real c, so your own prediction stays smooth.
-//
-// We can't just zero this.dc/ed (ta re-clamps dc>=0 and still adds ed), and a
-// lower c must ALSO reach the wire, not only the fields. So we reimplement
-// ta for inputs: send c - value to the host, store the real c locally.
-// op.value = how many frames earlier to report (bigger = more desync).
-const op={on:false,value:50,hold:6,phase:0,hooked:false,diag:true,_n:0};
-
+// Exact gabius/Juze mechanism: for delayed client inputs, write an absolute
+// constant frame (default 10) to the wire while retaining the real frame
+// locally. Their original source literally does:
+//   if (sld) d.tb(sldVar ?? 10); else d.tb(c);
+// No input spam, oscillation or extra update loop.
+const op={on:false,value:10,hooked:false};
 function installOpMode(room){
-  if(op.hooked) return;
-  const proto=Object.getPrototypeOf(room);
-  if(!proto||!proto.ta){ console.log('[Cipher] OP: no ta on room proto'); return; }
-  // DIAG: report what the room actually is and where ta lives.
-  console.log('[Cipher] OP diag: room ctor=%s protoHasTa=%s ownTa=%s',
-    room.constructor&&room.constructor.name, typeof proto.ta,
-    Object.prototype.hasOwnProperty.call(proto,'ta'));
-  const _origTa=proto.ta;
+  if(op.hooked||!room||room.constructor.name!=='Ia') return;
+  const proto=Object.getPrototypeOf(room), original=proto.ta;
+  if(!original) return;
   proto.ta=function(a){
-    // DIAG: log EVERY action through ta so we can see if inputs route here.
-    if(op.diag){
-      if((op._n++ % 20)===0){
-        console.log('[Cipher OP diag] ta called: hasTd=%s delay=%s yd=%d Y=%d ed=%d dc=%d on=%s',
-          !!(a&&a.Td), a&&a.Td&&a.Td.delay, this.yd, this.Y, this.ed|0, this.dc, op.on);
-      }
+    if(!(op.on&&a&&a.Td&&a.Td.delay&&this.yd===3))
+      return original.call(this,a);
+    const seq=this.jq++;
+    if(this.dc<0)this.dc=0;
+    const realFrame=this.Y+(this.ed|0)+this.dc;
+    const out=A.ka();
+    out.m(1);
+    out.tb(op.value);              // exact original OP Mode modification
+    out.tb(seq);
+    p.Cj(a,out);
+    this.Vb(out);
+    if(a.Td.Ca){
+      a.Ge=seq;a.P=this.yc;a.gb=realFrame;this.Hg.sn(a);
     }
-    // Only touch real gameplay inputs. Chat/admin (delay=false) stay in sync.
-    if(!(op.on && a && a.Td && a.Td.delay && 3===this.yd)){
-      return _origTa.call(this,a);
-    }
-    // Reimplement ta() so the frame we REPORT swings hard around the host's
-    // target while our LOCAL apply-frame stays correct.
-    //
-    // The host computes Hn = c - (Y + Od) from our reported frame c and
-    // broadcasts it uncapped; remote clients feed Hn into our disc's
-    // extrapolation. A small/steady Hn = smooth (what we got before). To make
-    // enemies see teleport/shaky, Hn must swing violently: we alternate c far
-    // below and far above the target each input, so remote extrapolation
-    // projects our disc forward then backward = jitter/teleport. Our own view
-    // uses a.gb = cReal, so locally we stay normal per our extrapolation.
-    const b=this.jq++;
-    if(0>this.dc) this.dc=0;
-    const cReal=this.Y+(this.ed|0)+this.dc;      // real apply-frame (local)
-    // Hold each extreme for `hold` ticks before flipping. Alternating every
-    // single tick at 60fps lets the observer average it back to smooth; holding
-    // one side for several ticks makes the disc settle far ahead, then snap far
-    // behind = visible teleport.
-    op._c=(op._c||0)+1;
-    if(op._c>=(op.hold||6)){ op._c=0; op.phase^=1; }
-    const swing=op.value;                        // how far to swing (frames)
-    const cSend=op.phase ? (this.Y - swing) : (this.Y + swing);
-    if((op._m=(op._m||0)+1)%20===0){
-      console.log('[Cipher OP ACTIVE] cReal=%d cSend=%d swing=%d phase=%d',
-        cReal, cSend, swing, op.phase);
-    }
-    const d=A.ka();
-    d.m(1);
-    d.tb(cSend);                                 // <-- swinging frame on wire
-    d.tb(b);
-    p.Cj(a,d);
-    this.Vb(d);
-    // Per-tick resends are wire-only: never apply locally (would double our
-    // own movement). Real inputs keep the normal local apply.
-    if(a.Td.Ca && !a.__cipherResend){ a.Ge=b; a.P=this.yc; a.gb=cReal; this.Hg.sn(a); }
   };
   op.hooked=true;
-  console.log('%c[Cipher] OP Mode hook installed','color:#0f0');
 }
 
 // ====================== CONTROLLER ======================
@@ -650,20 +596,6 @@ Da.prototype.sf=function(){
       if(inp&16)bc.Qc.add('Kick');
       bc.A();
     }
-  }
-  // OP Mode continuous resend: the game only sends input on key CHANGE, so a
-  // single desynced frame-stamp isn't enough for a sustained shaky effect.
-  // While OP is on, re-send the current input every tick through ta() (which
-  // applies the frame swing), producing a continuous stream of desynced
-  // position updates that wreck enemy extrapolation. Our local state is
-  // unaffected because ta() stores the real frame in a.gb.
-  if(op.on && hax.room && typeof Ja!=='undefined'){
-    try{
-      const msg=new Ja();
-      msg.input = this.W ? (this.W.ng||0) : 0;
-      msg.__cipherResend=true;   // wire-only: don't apply locally
-      hax.room.ta(msg);
-    }catch(e){ if(!op._err){op._err=1;console.log('[Cipher] OP resend err',e.message);} }
   }
   return _origSf.call(this);
 };
@@ -690,9 +622,7 @@ window.addEventListener('keydown',function(e){
   }
 },true);
 
-// Adjust OP Mode strength from the console: __hax__.setOp(value)
-hax.setOp=function(v){op.value=Math.max(0,v|0);console.log('[Cipher] OP Mode value =',op.value);};
-
+hax.setOp=function(v){op.value=Math.max(0,v|0);};
 window.__hax__=hax;
 console.log('%c[Cipher] v4 loaded — F8: aim assist | F9: bot AI | CTRL: OP Mode','color:#0af;font-size:12px');
 })();

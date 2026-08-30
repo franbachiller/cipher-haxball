@@ -71,7 +71,12 @@ async function verifyToken(token) {
 
   try {
     const data = await rpc('verify_token', { p_token: token, p_hwid: hwid });
-    return data.valid === true;
+    // Only treat an explicit { valid: false } as revocation.
+    // Any other shape (HTTP error body, unexpected JSON) is treated as
+    // unreachable so we fall back to the grace period instead of wiping
+    // a valid license on a transient server error.
+    if (data && typeof data.valid === 'boolean') return data.valid;
+    return null;
   } catch {
     // Supabase unreachable — allow grace period
     return null;

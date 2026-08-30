@@ -36,17 +36,6 @@ function createWindow() {
     mainWindow.setTitle('Cipher Launcher');
   });
 
-  // TEMP DIAG: mirror renderer console (incl. bridge) to a file so we can read
-  // OP Mode diagnostics without opening DevTools. Remove after diagnosis.
-  const fs = require('fs');
-  const logPath = path.join(app.getPath('userData'), 'cipher-console.log');
-  mainWindow.webContents.on('console-message', (_e, _level, message) => {
-    if (message.includes('[Cipher')) {
-      try { fs.appendFileSync(logPath, message + '\n'); } catch {}
-    }
-  });
-  console.log('[Cipher] console log ->', logPath);
-
   bootstrap();
 }
 

@@ -577,6 +577,347 @@ function installOpMode(room){
 
 // ====================== CONTROLLER ======================
 const hax={active:false,aimAssist:true,controller:null,room:null};
+
+// ====================== CONTROL PANEL ======================
+// The panel lives in an isolated shadow tree so HaxBall styles cannot affect it
+// and its styles cannot escape into the game UI. All controls write to the same
+// hax/op state used by the existing keyboard shortcuts.
+let cipherPanel=null;
+
+function ensureCipherPanelMounted(){
+  if(!cipherPanel)return false;
+  const mount=document.body||document.documentElement;
+  if(!mount)return false;
+  const {host}=cipherPanel;
+  if(host.parentNode!==mount)mount.appendChild(host);
+  return host.isConnected;
+}
+
+function syncCipherPanel(){
+  if(!cipherPanel)return;
+  ensureCipherPanelMounted();
+  const {host,aimSwitch,botSwitch,opSwitch,opConfig,opInput}=cipherPanel;
+  const syncSwitch=(button,on)=>{
+    button.setAttribute('aria-checked',String(on));
+    button.dataset.on=String(on);
+  };
+  syncSwitch(aimSwitch,hax.aimAssist);
+  syncSwitch(botSwitch,hax.active);
+  syncSwitch(opSwitch,op.on);
+  opConfig.dataset.enabled=String(op.on);
+  opInput.disabled=!op.on;
+  opInput.value=String(op.value);
+  host.setAttribute('aria-hidden',String(!cipherPanel.open));
+  host.dataset.open=String(cipherPanel.open);
+}
+
+function setAimAssist(on){
+  hax.aimAssist=!!on;
+  syncCipherPanel();
+  console.log('%c[Cipher] Aim assist '+(hax.aimAssist?'ON':'OFF'),
+    'color:'+(hax.aimAssist?'#0f0':'#f44')+';font-size:14px;font-weight:bold');
+}
+
+function setBotActive(on){
+  hax.active=!!on;
+  syncCipherPanel();
+  console.log('%c[Cipher] Bot '+(hax.active?'ON':'OFF'),
+    'color:'+(hax.active?'#0f0':'#f44')+';font-size:14px;font-weight:bold');
+}
+
+function setOpActive(on){
+  op.on=!!on;
+  syncCipherPanel();
+  console.log('%c[Cipher] OP Mode '+(op.on?'ON':'OFF')+' (value '+op.value+')',
+    'color:'+(op.on?'#0f0':'#f44')+';font-size:14px;font-weight:bold');
+}
+
+function setCipherPanelOpen(open){
+  if(!cipherPanel)return false;
+  ensureCipherPanelMounted();
+  cipherPanel.open=typeof open==='boolean'?open:!cipherPanel.open;
+  if(!cipherPanel.open&&cipherPanel.shadow.activeElement)
+    cipherPanel.shadow.activeElement.blur();
+  syncCipherPanel();
+  return cipherPanel.open;
+}
+
+function createCipherPanel(){
+  if(cipherPanel||!document.documentElement)return;
+  const host=document.createElement('div');
+  host.id='cipher-control-panel';
+  host.dataset.open='false';
+  host.setAttribute('aria-hidden','true');
+  const shadow=host.attachShadow({mode:'closed'});
+  shadow.innerHTML=`
+    <style>
+      :host{
+        all:initial;
+        position:fixed;
+        z-index:2147483647;
+        top:16px;
+        right:16px;
+        width:min(322px,calc(100vw - 24px));
+        color:#d5d5d5;
+        font-family:Inter,"Segoe UI",system-ui,-apple-system,sans-serif;
+        font-size:12px;
+        line-height:1.35;
+        color-scheme:dark;
+        opacity:0;
+        visibility:hidden;
+        pointer-events:none;
+        transform:translateY(-6px);
+        transition:opacity 140ms ease,transform 140ms ease,visibility 140ms;
+      }
+      :host([data-open="true"]){
+        opacity:1;
+        visibility:visible;
+        pointer-events:auto;
+        transform:translateY(0);
+      }
+      *,*::before,*::after{box-sizing:border-box}
+      button,input{font:inherit}
+      .panel{
+        position:relative;
+        overflow:hidden;
+        background:rgba(13,13,14,.91);
+        border:1px solid rgba(255,255,255,.09);
+        border-radius:7px;
+        box-shadow:0 18px 48px rgba(0,0,0,.48),0 2px 8px rgba(0,0,0,.34);
+        -webkit-backdrop-filter:blur(9px);
+        backdrop-filter:blur(9px);
+      }
+      .panel::before{
+        content:"";
+        position:absolute;
+        inset:0 auto 0 0;
+        width:2px;
+        background:#d42020;
+        opacity:.9;
+      }
+      .header{
+        display:grid;
+        grid-template-columns:1fr auto;
+        align-items:start;
+        min-height:70px;
+        padding:15px 14px 12px 17px;
+        border-bottom:1px solid rgba(255,255,255,.065);
+      }
+      .brand-row{display:flex;align-items:baseline;gap:12px;min-width:0}
+      .brand{
+        color:#d42020;
+        font-size:20px;
+        font-weight:200;
+        letter-spacing:6px;
+        line-height:1;
+        text-shadow:0 0 8px rgba(212,32,32,.32),0 0 18px rgba(212,32,32,.14);
+      }
+      .eyebrow{
+        color:#737378;
+        font-size:8px;
+        font-weight:650;
+        letter-spacing:1.8px;
+        text-transform:uppercase;
+      }
+      .subhead{margin-top:8px;color:#66666b;font-size:9px;letter-spacing:.5px}
+      .close{
+        min-width:35px;
+        height:22px;
+        padding:0 7px;
+        color:#85858a;
+        background:#171719;
+        border:1px solid #2a2a2d;
+        border-radius:3px;
+        font-size:8px;
+        font-weight:700;
+        letter-spacing:1px;
+        cursor:pointer;
+      }
+      .close:hover{color:#d2d2d5;border-color:#454549;background:#1c1c1f}
+      .close:active{transform:translateY(1px)}
+      button:focus-visible,input:focus-visible{
+        outline:2px solid rgba(212,32,32,.9);
+        outline-offset:2px;
+      }
+      .features{padding:3px 14px 3px 17px}
+      .feature{
+        display:grid;
+        grid-template-columns:minmax(0,1fr) auto;
+        gap:13px;
+        align-items:center;
+        padding:13px 0;
+        border-bottom:1px solid rgba(255,255,255,.055);
+      }
+      .feature:last-of-type{border-bottom:0}
+      .feature-top{display:flex;align-items:center;gap:7px;margin-bottom:3px}
+      .name{color:#d2d2d4;font-size:11px;font-weight:600;letter-spacing:.15px}
+      .key{
+        min-width:29px;
+        padding:2px 4px;
+        color:#69696f;
+        background:#171719;
+        border:1px solid #29292c;
+        border-radius:3px;
+        font-size:7px;
+        font-weight:700;
+        letter-spacing:.7px;
+        line-height:1.2;
+        text-align:center;
+      }
+      .desc{color:#65656a;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .switch{
+        position:relative;
+        width:34px;
+        height:18px;
+        padding:0;
+        flex:none;
+        background:#202023;
+        border:1px solid #343438;
+        border-radius:10px;
+        cursor:pointer;
+        transition:background 120ms ease,border-color 120ms ease;
+      }
+      .switch::after{
+        content:"";
+        position:absolute;
+        top:3px;
+        left:3px;
+        width:10px;
+        height:10px;
+        border-radius:50%;
+        background:#77777c;
+        box-shadow:0 1px 2px rgba(0,0,0,.55);
+        transition:transform 120ms ease,background 120ms ease;
+      }
+      .switch[data-on="true"]{background:#321415;border-color:#6a2225}
+      .switch[data-on="true"]::after{transform:translateX(16px);background:#d42020}
+      .switch:hover{border-color:#55555a}
+      .op-config{
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:12px;
+        margin:0 14px 11px 17px;
+        padding:8px 10px;
+        background:rgba(255,255,255,.025);
+        border:1px solid rgba(255,255,255,.055);
+        border-radius:4px;
+        transition:opacity 120ms ease;
+      }
+      .op-config[data-enabled="false"]{opacity:.42}
+      .op-label{color:#78787d;font-size:8px;font-weight:650;letter-spacing:1.15px;text-transform:uppercase}
+      .value-wrap{display:flex;align-items:center;gap:6px}
+      .value-wrap::after{content:"FRAME";color:#55555a;font-size:7px;font-weight:650;letter-spacing:.9px}
+      .op-value{
+        width:49px;
+        height:25px;
+        padding:3px 5px;
+        color:#d2d2d5;
+        background:#111113;
+        border:1px solid #303034;
+        border-radius:3px;
+        text-align:center;
+        font-variant-numeric:tabular-nums;
+        -moz-appearance:textfield;
+      }
+      .op-value::-webkit-inner-spin-button{opacity:.35}
+      .op-value:disabled{color:#77777b;cursor:not-allowed}
+      .footer{
+        padding:10px 14px 11px 17px;
+        border-top:1px solid rgba(255,255,255,.06);
+        color:#56565b;
+        font-size:8px;
+        letter-spacing:.55px;
+      }
+      @media(max-width:420px){
+        :host{top:8px;right:8px;width:calc(100vw - 16px)}
+        .header{min-height:63px;padding-top:13px}
+        .feature{padding:11px 0}
+      }
+      @media(prefers-reduced-motion:reduce){
+        :host,.switch,.switch::after,.op-config{transition:none!important}
+      }
+    </style>
+    <section class="panel" aria-label="Cipher controls">
+      <header class="header">
+        <div>
+          <div class="brand-row">
+            <span class="brand">cipher</span>
+            <span class="eyebrow">Control</span>
+          </div>
+          <div class="subhead">in-game bridge / input modules</div>
+        </div>
+        <button class="close" type="button" aria-label="Hide Cipher controls">INS</button>
+      </header>
+      <div class="features">
+        <div class="feature">
+          <div>
+            <div class="feature-top"><span class="name">Aim Assist</span><span class="key">F8</span></div>
+            <div class="desc">Projected kick path and target line</div>
+          </div>
+          <button class="switch aim-switch" type="button" role="switch" aria-label="Aim Assist" aria-checked="true"></button>
+        </div>
+        <div class="feature">
+          <div>
+            <div class="feature-top"><span class="name">AI Bot</span><span class="key">F9</span></div>
+            <div class="desc">Autonomous positioning and ball control</div>
+          </div>
+          <button class="switch bot-switch" type="button" role="switch" aria-label="AI Bot" aria-checked="false"></button>
+        </div>
+        <div class="feature">
+          <div>
+            <div class="feature-top"><span class="name">OP Mode</span><span class="key">CTRL</span></div>
+            <div class="desc">Absolute delayed input frame override</div>
+          </div>
+          <button class="switch op-switch" type="button" role="switch" aria-label="OP Mode" aria-checked="false"></button>
+        </div>
+      </div>
+      <label class="op-config" data-enabled="false">
+        <span class="op-label">Wire value</span>
+        <span class="value-wrap"><input class="op-value" type="number" min="0" max="120" step="1" value="10" aria-label="OP Mode absolute wire frame value"></span>
+      </label>
+      <footer class="footer">
+        <span>Insert to hide</span>
+      </footer>
+    </section>`;
+
+  const aimSwitch=shadow.querySelector('.aim-switch');
+  const botSwitch=shadow.querySelector('.bot-switch');
+  const opSwitch=shadow.querySelector('.op-switch');
+  const opConfig=shadow.querySelector('.op-config');
+  const opInput=shadow.querySelector('.op-value');
+  const close=shadow.querySelector('.close');
+  cipherPanel={host,shadow,open:false,aimSwitch,botSwitch,opSwitch,opConfig,opInput};
+
+  aimSwitch.addEventListener('click',()=>setAimAssist(!hax.aimAssist));
+  botSwitch.addEventListener('click',()=>setBotActive(!hax.active));
+  opSwitch.addEventListener('click',()=>setOpActive(!op.on));
+  close.addEventListener('click',()=>setCipherPanelOpen(false));
+  opInput.addEventListener('change',()=>{
+    const parsed=Number(opInput.value);
+    op.value=Number.isFinite(parsed)?clamp(Math.trunc(parsed),0,120):10;
+    syncCipherPanel();
+  });
+  opInput.addEventListener('keydown',e=>{
+    if(e.code==='Enter')opInput.blur();
+  });
+
+  // Keep pointer and typing events inside the panel instead of the game UI.
+  for(const type of ['keydown','keyup','keypress','pointerdown','pointerup','mousedown','mouseup','click','dblclick','contextmenu','wheel','touchstart','touchend'])
+    shadow.addEventListener(type,e=>e.stopPropagation());
+
+  ensureCipherPanelMounted();
+  syncCipherPanel();
+}
+
+createCipherPanel();
+// The bridge executes before HaxBall completes its final DOM initialization.
+// Mount once more after that task so a body replacement cannot strand the
+// single Shadow DOM host in a detached tree.
+setTimeout(()=>{
+  ensureCipherPanelMounted();
+  syncCipherPanel();
+},0);
 const _origSf=Da.prototype.sf;
 Da.prototype.sf=function(){
   // Always update — a new Da is created each time you join a room
@@ -601,28 +942,50 @@ Da.prototype.sf=function(){
 };
 
 // ====================== HOTKEYS ======================
-window.addEventListener('keydown',function(e){
-  if(e.code==='F9'){
-    e.preventDefault();e.stopPropagation();
-    hax.active=!hax.active;
-    console.log('%c[Cipher] Bot '+(hax.active?'ON':'OFF'),
-      'color:'+(hax.active?'#0f0':'#f44')+';font-size:14px;font-weight:bold');
-  }
-  if(e.code==='F8'){
-    e.preventDefault();e.stopPropagation();
-    hax.aimAssist=!hax.aimAssist;
-    console.log('%c[Cipher] Aim assist '+(hax.aimAssist?'ON':'OFF'),
-      'color:'+(hax.aimAssist?'#0f0':'#f44')+';font-size:14px;font-weight:bold');
-  }
-  if(e.code==='ControlLeft'||e.code==='ControlRight'){
-    e.preventDefault();e.stopPropagation();
-    op.on=!op.on;
-    console.log('%c[Cipher] OP Mode '+(op.on?'ON':'OFF')+' (value '+op.value+')',
-      'color:'+(op.on?'#0f0':'#f44')+';font-size:14px;font-weight:bold');
-  }
-},true);
+function isInsertEvent(e){
+  return e.code==='Insert'||e.key==='Insert'||e.keyCode===45||e.which===45;
+}
 
-hax.setOp=function(v){op.value=Math.max(0,v|0);};
+function cipherHotkeyHandler(e){
+  const isInsert=isInsertEvent(e);
+  const isFeature=e.code==='F8'||e.code==='F9'||e.code==='ControlLeft'||e.code==='ControlRight';
+  if(!isInsert&&!isFeature)return;
+
+  // Keyboard input intended for a panel control must not toggle game features.
+  const path=typeof e.composedPath==='function'?e.composedPath():[];
+  const fromPanel=cipherPanel&&path.includes(cipherPanel.host);
+  if(fromPanel&&!isInsert){
+    e.stopImmediatePropagation();
+    return;
+  }
+
+  e.preventDefault();e.stopImmediatePropagation();
+  if(e.repeat)return;
+  if(isInsert){setCipherPanelOpen();return;}
+  if(e.code==='F9'){setBotActive(!hax.active);return;}
+  if(e.code==='F8'){setAimAssist(!hax.aimAssist);return;}
+  setOpActive(!op.on);
+}
+
+// HaxBall keeps the game in an iframe while keyboard focus can remain on
+// /play. Listen in every same-origin browsing context without registering the
+// handler twice when window, parent and top resolve to the same object.
+const hotkeyTargets=[];
+function addHotkeyTarget(target){
+  if(!target||hotkeyTargets.includes(target))return;
+  try{
+    target.addEventListener('keydown',cipherHotkeyHandler,true);
+    hotkeyTargets.push(target);
+  }catch(e){
+    // Cross-origin parent/top access is expected to fail safely.
+  }
+}
+addHotkeyTarget(window);
+try{addHotkeyTarget(window.parent);}catch(e){}
+try{addHotkeyTarget(window.top);}catch(e){}
+
+hax.setOp=function(v){op.value=Math.max(0,v|0);syncCipherPanel();return op.value;};
+hax.togglePanel=function(open){return setCipherPanelOpen(open);};
 window.__hax__=hax;
-console.log('%c[Cipher] v4 loaded — F8: aim assist | F9: bot AI | CTRL: OP Mode','color:#0af;font-size:12px');
+console.log('%c[Cipher] v4 loaded — INS: controls | F8: aim assist | F9: bot AI | CTRL: OP Mode','color:#0af;font-size:12px');
 })();

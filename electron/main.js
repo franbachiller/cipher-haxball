@@ -1,10 +1,15 @@
 const { app, BrowserWindow, ipcMain, session } = require('electron');
 const path = require('path');
 const { setupInterceptor } = require('./interceptor');
+const { setupAdblock } = require('./adblock');
 const { validateLicense, verifyToken, saveLicense, loadLicense, clearLicense } = require('./license');
 
 // How long the launcher runs offline before requiring a fresh online check.
 const GRACE_PERIOD_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
+
+// Match electron-builder's appId so Windows uses Cipher's icon and groups
+// taskbar windows under the application instead of the generic Electron app.
+app.setAppUserModelId('com.cipher.haxball');
 
 let mainWindow = null;
 
@@ -14,7 +19,8 @@ function createWindow() {
     height: 720,
     minWidth: 960,
     minHeight: 540,
-    title: 'Cipher',
+    title: 'Cipher Launcher',
+    icon: path.join(__dirname, 'ui', 'cipherC.png'),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -22,6 +28,12 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: false,
     },
+  });
+
+  // Keep the window title fixed; haxball.com would otherwise overwrite it.
+  mainWindow.on('page-title-updated', (e) => {
+    e.preventDefault();
+    mainWindow.setTitle('Cipher Launcher');
   });
 
   bootstrap();
@@ -71,6 +83,9 @@ function showLogin(reason) {
 async function startGame(token) {
   // Set up the game-min.js interceptor (CDP-based) before navigating
   setupInterceptor(mainWindow.webContents);
+
+  // Block ads/trackers at the network layer and hide the empty ad column
+  setupAdblock(mainWindow.webContents.session, mainWindow.webContents);
 
   // Disable CORS restrictions so haxball.com loads cleanly
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, cb) => {

@@ -607,3 +607,62 @@ Password: max 30 chars
 Kick reason: max 100 chars
 Stadium: max 255 vertexes, segments, planes, goals, discs
 ```
+
+---
+
+## 16. Netcode / Sincronización (base para OP Mode)
+
+La clase `oa` (RoomBase, extendida por `Ia` ClientRoom y `Zb` HostRoom) contiene
+el motor de sync. En el controller `Da`, la instancia room es `this.za`.
+
+### Campos de timing (instancia room)
+
+| Campo | Significado | Setter |
+|-------|-------------|--------|
+| `Y` | Frame actual del cliente | — |
+| `Ad` | Extrapolación en frames | `Gm(ms)` → `ms * 0.06` |
+| `dc` | Handicap en frames | `Xr(ms)` → `ms * 0.06` |
+| `ed` | Tiempo de render extrapolado (frames) | recalculado cada `A()` |
+| `Ec` | Constante ms→frames = 0.06 | — |
+| `Vf` | Máximo de frames a extrapolar = 120 | — |
+
+### Métodos clave
+
+- `ta(a)` (L8523): envía una acción al host. Para acciones con `a.Td.delay`
+  calcula el frame de aplicación: `c = this.Y + (this.ed|0) + this.dc`, lo
+  serializa (`d.tb(c)`) y lo manda. El host encola la acción para ese frame y
+  la broadcastea a todos.
+- `hg()` (L8361): produce el estado a renderizar extrapolando
+  `now*0.06 + serverOffset - Y + dc + Ad` frames vía `Rk()`. Este es el estado
+  que VE el jugador local — usa su estado confirmado real.
+- `Rk(a,b)` (L8226): simula `a` frames hacia adelante desde `this.T` (estado
+  confirmado) aplicando acciones encoladas. No muta el estado confirmado.
+- `Sj(a)`: avanza el estado confirmado aplicando acciones hasta el frame.
+
+### Mecanismo del OP Mode
+
+En `ta()`, para inputs (`Td.delay===true`) el frame de aplicación es
+`c = Y + (ed|0) + dc`. Ese `c` se envía al host Y se guarda en `a.gb` para tu
+predicción local. Normalmente `c - Y` es ~3..5 (el lead de tu extrapolación).
+
+El anti-opmode de la comunidad (node-haxball, discussion #51) detecta el cheat
+justo por esto: filtra los mensajes de input y calcula `clientFrame - hostFrame`;
+si es anormalmente BAJO (`<= 2`, a menudo 0 o negativo) es opmode.
+
+Por lo tanto OP Mode = reportar al host un frame MÁS TEMPRANO manteniendo el
+frame real localmente:
+- Host y clientes remotos reciben tu input como "ya aplicado" (frame ≈ ahora),
+  no pueden extrapolarte hacia adelante → tu posición confirmada salta y te ven
+  shaky/intocable.
+- Vos: `a.gb` conserva el `c` real, así tu propia predicción sigue fluida.
+
+No alcanza con poner `dc`/`ed` en 0 (el `ta` re-clampea `dc>=0` y suma `ed`, y
+además el frame bajo debe llegar al cable, no solo a los campos). Por eso el
+hook reimplementa `ta` para inputs: serializa `c - value` al host y guarda el
+`c` real en `a.gb`.
+
+IMPORTANTE (corrección de una versión previa): sumar a `dc` es el error opuesto
+— sube `c`, te agrega delay a vos y no afecta a los demás. Hay que RESTAR.
+
+Implementado en `src/inject/bridge.js` (sección OP MODE), toggle con CTRL,
+valor ajustable vía `__hax__.setOp(v)`. Default 6 frames antes.

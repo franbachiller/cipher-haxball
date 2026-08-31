@@ -1,11 +1,12 @@
 # Dependencies
 node_modules/
 
-# Supabase credentials — config.js holds real keys (service_role / anon).
-# Only the *.example.js templates are committed. NEVER commit config.js.
-config.js
+# Supabase credentials — real keys live in gitignored files.
+# Only *.example.js templates and the credential-free electron/config.js
+# loader are committed. NEVER commit anything below.
 admin/config.js
-electron/config.js
+electron/config.dev.js
+electron/config.prod.js
 
 # Environment / secrets
 .env

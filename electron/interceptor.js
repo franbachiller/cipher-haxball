@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { app } = require('electron');
 
 // Bridge code is loaded once at startup.
 // In production builds, this will be the obfuscated/encrypted version.
@@ -10,14 +11,16 @@ let bridgeCode = null;
 
 function loadBridge() {
   if (bridgeCode) return bridgeCode;
-  try {
-    bridgeCode = fs.readFileSync(BRIDGE_PATH, 'utf8');
-    console.log('[Cipher] Loaded encrypted bridge');
-  } catch {
-    // Fallback to raw source during development
+  // Dev (unpackaged): always use the raw source so edits take effect on
+  // restart. Prod (packaged): use the obfuscated bridge. A stale bridge.enc.js
+  // in the working tree must never shadow the source during development.
+  if (!app.isPackaged) {
     bridgeCode = fs.readFileSync(BRIDGE_FALLBACK, 'utf8');
-    console.log('[Cipher] Loaded dev bridge (unobfuscated)');
+    console.log('[Cipher] Loaded dev bridge (unobfuscated source)');
+    return bridgeCode;
   }
+  bridgeCode = fs.readFileSync(BRIDGE_PATH, 'utf8');
+  console.log('[Cipher] Loaded encrypted bridge');
   return bridgeCode;
 }
 

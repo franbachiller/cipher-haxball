@@ -1,5 +1,14 @@
 -- Cipher license server schema
 -- Run this in the Supabase SQL Editor (Dashboard -> SQL Editor -> New query)
+-- Run it once per project (dev AND prod).
+
+-- ============================================================
+-- Extensions
+-- ============================================================
+-- pgcrypto provides gen_random_bytes(), used to mint tokens and keys below.
+-- On Supabase it lives in the `extensions` schema. Without this the RPCs fail
+-- with: function gen_random_bytes(integer) does not exist.
+create extension if not exists pgcrypto with schema extensions;
 
 -- ============================================================
 -- Tables
@@ -64,7 +73,7 @@ begin
 
   -- HWID binding: first activation binds; mismatch rejects
   if lic.hwid is null then
-    new_token := encode(gen_random_bytes(32), 'hex');
+    new_token := encode(extensions.gen_random_bytes(32), 'hex');
     update licenses
       set hwid = p_hwid,
           token = new_token,
@@ -77,7 +86,7 @@ begin
 
   if lic.hwid = p_hwid then
     -- Re-activation on the same machine: reissue token
-    new_token := encode(gen_random_bytes(32), 'hex');
+    new_token := encode(extensions.gen_random_bytes(32), 'hex');
     update licenses
       set token = new_token,
           last_seen_at = now()
@@ -145,9 +154,9 @@ declare
   new_key text;
 begin
   new_key := 'CIPHER-' ||
-    upper(encode(gen_random_bytes(2), 'hex')) || '-' ||
-    upper(encode(gen_random_bytes(2), 'hex')) || '-' ||
-    upper(encode(gen_random_bytes(2), 'hex'));
+    upper(encode(extensions.gen_random_bytes(2), 'hex')) || '-' ||
+    upper(encode(extensions.gen_random_bytes(2), 'hex')) || '-' ||
+    upper(encode(extensions.gen_random_bytes(2), 'hex'));
 
   insert into licenses (key, expires_at, note)
   values (

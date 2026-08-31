@@ -14,14 +14,20 @@
   <header>
     <span class="brand">cipher</span>
     <span class="brand-sub">admin</span>
-    <span id="env-badge" class="env-badge"></span>
+    <nav class="env-switcher" aria-label="Environment">
+      <button id="env-dev-btn" class="env-option" type="button">DEV</button>
+      <button id="env-prod-btn" class="env-option" type="button">PRODUCTION</button>
+    </nav>
   </header>
 
   <main>
 
     <!-- Create license -->
     <section class="card" id="create-section">
-      <h2>New license</h2>
+      <div class="section-title">
+        <h2>New license</h2>
+        <span id="create-env-label" class="create-env-label"></span>
+      </div>
       <form id="create-form">
         <div class="row">
           <div class="field">
@@ -32,7 +38,7 @@
             <label for="days">Days</label>
             <input type="number" id="days" placeholder="30" min="1">
           </div>
-          <button type="submit">Generate</button>
+          <button id="generate-btn" type="submit">Generate</button>
         </div>
       </form>
       <p id="created-key" class="mono" hidden></p>

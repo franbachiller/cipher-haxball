@@ -361,35 +361,55 @@ function readState(room){
 // Then simulates the trajectory with wall bounces.
 // Drawn directly on the game canvas in world coordinates (hooking the renderer).
 
-function simKickTrajectory(ball, playerPos, fw, fh, ticks) {
-  const KICK_STRENGTH = 5;  // game default
-  const BALL_INV_MASS = 1;  // ball invMass in classic
-  const BALL_R = ball.radius || 10;
-  const D = 0.99; // ball damping
+const AIM_TRAJECTORY_TICKS = 180;
+const AIM_LINE_COLOR = '#ff2028';
 
-  // Kick direction = normalize(ball - player)
-  const dx = ball.x - playerPos.x, dy = ball.y - playerPos.y;
+function simKickTrajectory(ball, playerPos, world, stadium, ticks) {
+  if (!ball || !world) return [];
+
+  // Kick direction = normalize(ball - player). Use the live stadium kick
+  // strength and ball inverse mass instead of classic-map constants.
+  const dx = ball.a.x - playerPos.x, dy = ball.a.y - playerPos.y;
   const d = Math.sqrt(dx*dx + dy*dy);
   if (d < 1e-6) return [];
   const nx = dx/d, ny = dy/d;
 
-  // Apply kick impulse to ball velocity
-  let vx = ball.vx + nx * KICK_STRENGTH * BALL_INV_MASS;
-  let vy = ball.vy + ny * KICK_STRENGTH * BALL_INV_MASS;
-  let x = ball.x, y = ball.y;
+  // Build an isolated one-disc world with the exact live collision geometry.
+  // Wa.A resolves planes, straight/curved segments and vertices with the same
+  // radius, masks, damping and bounce coefficients as the game engine.
+  const simDisc = new ta;
+  simDisc.Jl = ball.Jl;
+  simDisc.i = ball.i;
+  simDisc.C = ball.C;
+  simDisc.ek = ball.ek;
+  simDisc.S = ball.S;
+  simDisc.Ea = ball.Ea;
+  simDisc.ca = ball.ca;
+  simDisc.o = ball.o;
+  simDisc.V = ball.V;
+  simDisc.a.x = ball.a.x;
+  simDisc.a.y = ball.a.y;
+  simDisc.G.x = ball.G.x;
+  simDisc.G.y = ball.G.y;
+  simDisc.ra.x = ball.ra.x;
+  simDisc.ra.y = ball.ra.y;
 
-  const mx = fw - BALL_R, my = fh - BALL_R;
-  const pts = [{x, y}];
+  const kickStrength = stadium && stadium.Kd ? stadium.Kd.ef : 5;
+  simDisc.G.x += nx * kickStrength * simDisc.ca;
+  simDisc.G.y += ny * kickStrength * simDisc.ca;
+
+  const simWorld = new Wa;
+  simWorld.H = [simDisc];
+  simWorld.L = world.L || [];
+  simWorld.X = world.X || [];
+  simWorld.sa = world.sa || [];
+  simWorld.rb = [];
+
+  const pts = [{x:simDisc.a.x, y:simDisc.a.y}];
 
   for (let t = 0; t < ticks; t++) {
-    x += vx; y += vy; vx *= D; vy *= D;
-    if (y < -my) { y = -my; vy = Math.abs(vy) * 0.5; }
-    if (y > my)  { y = my;  vy = -Math.abs(vy) * 0.5; }
-    if (Math.abs(y) > 80) {
-      if (x < -mx) { x = -mx; vx = Math.abs(vx) * 0.5; }
-      if (x > mx)  { x = mx;  vx = -Math.abs(vx) * 0.5; }
-    }
-    pts.push({x, y});
+    simWorld.A(1);
+    pts.push({x:simDisc.a.x, y:simDisc.a.y});
   }
   return pts;
 }
@@ -431,8 +451,12 @@ function drawAimLine(ctx, pts, color, alpha) {
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.setLineDash([8, 6]);
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.shadowColor = 'rgba(255,0,0,0.65)';
+  ctx.shadowBlur = 3;
+  ctx.setLineDash([10, 5]);
   ctx.beginPath();
   ctx.moveTo(pts[0].x, pts[0].y);
   for (let i = 1; i < pts.length; i++) {
@@ -489,11 +513,8 @@ function renderAimLine(renderer, gameState) {
   if (db > 120) return;
 
   const stad = gameState.U;
-  const fw = stad ? stad.bc : 420;
-  const fh = stad ? stad.tc : 200;
-
-  const ballState = {x: ball.a.x, y: ball.a.y, vx: ball.G.x, vy: ball.G.y, radius: ball.V};
-  const traj = simKickTrajectory(ballState, mePos, fw, fh, 60);
+  const world = gameState.M.va;
+  const traj = simKickTrajectory(ball, mePos, world, stad, AIM_TRAJECTORY_TICKS);
   if (traj.length < 2) return;
 
   const myTeam = me.fa.ba;
@@ -509,10 +530,6 @@ function renderAimLine(renderer, gameState) {
 
   const hitsGoal = trajectoryHitsGoal(traj, goals, oppTeam);
   const hitsMate = trajectoryReachesMate(traj, mates, myId);
-
-  let color = 'rgba(255,255,255,0.5)';
-  if (hitsGoal) color = 'rgba(0,255,136,0.8)';
-  else if (hitsMate) color = 'rgba(68,170,255,0.8)';
 
   // Reconstruct the world transform.
   // From T.Rc: translate(W/2, (H+top-bot)/2) → scale(zoom) → translate(-cam)
@@ -537,8 +554,7 @@ function renderAimLine(renderer, gameState) {
   ctx.scale(zoom, zoom);
   ctx.translate(-cam.x, -cam.y);
 
-  const alpha = clamp(1 - db / 120, 0.3, 0.9);
-  drawAimLine(ctx, traj, color, alpha);
+  drawAimLine(ctx, traj, AIM_LINE_COLOR, 0.95);
   if (hitsGoal) drawTarget(ctx, traj[traj.length - 1], '#00ff88');
   else if (hitsMate) drawTarget(ctx, hitsMate.pos, '#44aaff');
 

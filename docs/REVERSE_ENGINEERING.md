@@ -554,6 +554,46 @@ Para leer el game state desde JavaScript inyectado:
 // state.M.va.H[0].G.x, state.M.va.H[0].G.y = ball velocity
 ```
 
+### Aim Assist exacto (v1.1.0)
+
+El Aim Assist se dibuja después del render original mediante un hook a
+`T.prototype.Rc`. El contexto se vuelve a transformar a coordenadas de mundo
+replicando `translate → scale → translate(-camera)` del renderer.
+
+La implementación anterior aproximaba Classic como un rectángulo usando
+`stad.bc`, `stad.tc`, rebote fijo `0.5` y una boca de arco hardcodeada a
+`|y| < 80`. Esa aproximación podía dibujar el vértice del rebote fuera de la
+pared y no era válida para estadios custom.
+
+`simKickTrajectory` ahora realiza estos pasos:
+
+1. Copia la pelota viva (`ta`) a un disco aislado, conservando posición,
+   velocidad, radio `V`, gravedad `ra`, damping `Ea`, masa inversa `ca`, rebote
+   `o` y máscaras `i/C`.
+2. Aplica el impulso con la fuerza real `stadium.Kd.ef * ball.ca` en la dirección
+   `normalize(ball - player)`.
+3. Crea un `Wa` temporal con un único disco y reutiliza sin modificar la
+   geometría del mundo activo:
+   - `world.sa`: planos infinitos (`S[]`).
+   - `world.X`: segmentos rectos y curvos (`I[]`).
+   - `world.L`: vértices (`G[]`).
+4. Ejecuta `Wa.A(1)` durante 180 ticks y guarda la posición corregida después
+   de cada tick.
+
+Al delegar la colisión en `Wa.A`, el punto de contacto respeta exactamente el
+radio de la pelota, las máscaras, los coeficientes de rebote y la geometría
+vigente. El mundo temporal deja `rb=[]` y no incluye jugadores u otros discos;
+la línea predice exclusivamente la trayectoria de la pelota contra el estadio.
+
+Presentación en `drawAimLine`:
+
+- Color fijo: `#ff2028` con alpha `0.95`.
+- Grosor: `2.4` unidades de mundo.
+- Dash: `[10, 5]`, extremos/uniones redondeados y glow rojo corto.
+- Sólo se muestra si Aim Assist está activo, existe partida/jugador/pelota y el
+  jugador está a 120 unidades o menos de la pelota.
+- Los marcadores auxiliares de gol y compañero continúan siendo verde y azul.
+
 ### Inyección de Input
 
 El input se envía via la clase `bc` como bitmask:

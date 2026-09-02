@@ -200,18 +200,38 @@ No publicar si falla cualquiera de estos pasos.
 
 ## Release
 
-Cuando `dev` esté estable:
+Cuando `dev` esté estable, commitear y publicar primero la rama de desarrollo:
+
+```powershell
+git checkout dev
+git push origin dev
+```
+
+Actualizar la versión de `electron/package.json` y
+`electron/package-lock.json`. Luego integrar localmente en `main`:
 
 ```powershell
 git checkout main
-git pull origin main
-git merge dev
-git push origin main
-git tag v1.0.0
-git push origin v1.0.0
+git pull --ff-only origin main
+git merge --no-ff dev -m "chore: merge release <version>"
 ```
 
-Luego construir desde `main` con las credenciales de producción.
+Construir desde `main` con las credenciales de producción y completar la
+auditoría y prueba del instalador. Sólo si todo pasa, publicar commit y tag:
+
+```powershell
+$version = "1.1.0" # reemplazar por la versión del release
+git push origin main
+git tag "v$version"
+git push origin "v$version"
+```
+
+Antes de distribuir, registrar en `CHANGELOG.md`:
+
+- Fecha, commit, tag, nombre del instalador y SHA-256.
+- Features y correcciones incluidas.
+- Qué se probó y qué no se probó.
+- Limitaciones conocidas, firma y política de actualización.
 
 Después del release:
 
@@ -286,8 +306,21 @@ Test-Path electron/config.prod.js
 
 Debe devolver `False`.
 
+### `EPIPE: broken pipe, write` al lanzar desde una terminal
+
+Puede aparecer si Electron fue iniciado desde una terminal o herramienta de
+depuración y esa herramienta cierra su pipe de salida mientras el proceso
+principal sigue ejecutándose. Un `console.log` posterior del interceptor intenta
+escribir sobre el pipe cerrado y Electron muestra un error del proceso principal.
+
+No está relacionado con la licencia ni con la inyección del bridge. Cerrar todas
+las instancias y abrir Cipher desde el acceso directo normal. Si se reproduce en
+un lanzamiento normal, tratarlo como bug y hacer que el logger tolere `EPIPE`
+antes del siguiente release.
+
 ## Pendientes de release
 
 - Firma digital del instalador para reducir alertas de SmartScreen.
 - Definir política de actualizaciones automáticas.
-- Mantener un changelog por versión.
+- Auditar y actualizar las dependencias que `npm ci` reporta con vulnerabilidades
+  altas, en un cambio separado y con prueba de regresión.

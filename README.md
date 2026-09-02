@@ -6,6 +6,28 @@ into haxball.com, gated behind a Supabase-backed license system.
 Para el procedimiento operativo completo de desarrollo, pruebas, seguridad y
 releases, ver [`docs/WORKFLOW.md`](docs/WORKFLOW.md).
 
+## Current release
+
+La versión oficial es **v1.1.0** (2026-09-02), commit `ffe8ab4`.
+
+- Instalador local: `electron/dist/Cipher Setup 1.1.0.exe`
+- SHA-256: `675F03BD3482F33E13B1054F1257C1AB50E4EE696F02A396E87D19D070EBE857`
+- Actualización manual: todavía no existe auto-updater.
+- Sin firma digital: Windows puede mostrar SmartScreen.
+
+El binario de `dist/` no se commitea. Ver el detalle funcional, validaciones y
+limitaciones en [`CHANGELOG.md`](CHANGELOG.md).
+
+## Gameplay controls
+
+- `Insert`: mostrar u ocultar el panel in-game.
+- `F8`: Aim Assist. La trayectoria usa las colisiones reales del estadio.
+- `F9`: AI Bot.
+- `Ctrl`: OP Mode.
+
+El panel y los atajos modifican el mismo estado; sus indicadores permanecen
+sincronizados.
+
 ## Structure
 
 ```
@@ -71,14 +93,16 @@ git checkout dev
 cd electron && npm install && npm start   # runs against dev (unpackaged)
 ```
 
-Iterate on the bridge and test in a real game with F8/F9. Nothing you do
-reaches a real user.
+Iterate on the bridge and test in a real game: movimiento manual, panel con
+`Insert`, Aim Assist con `F8`, AI Bot con `F9` y OP Mode con `Ctrl`. Nothing you
+do reaches a real user.
 
 When something is stable, merge to `main` and tag the release:
 
 ```bash
 git checkout main && git merge dev
-git tag v1.0.0
+VERSION=1.1.0 # reemplazar por la versión del release
+git tag "v$VERSION"
 ```
 
 ## Building the installer
